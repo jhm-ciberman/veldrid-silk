@@ -77,7 +77,7 @@ void main()
                     "opengles" or "gles" => GraphicsBackend.OpenGLES,
                     _ => throw new InvalidOperationException($"Unknown NEOVELDRID_BACKEND: '{backendEnv}'")
                 };
-            NeoVeldridStartup.CreateWindowAndGraphicsDevice(windowCI, options, GraphicsBackend.OpenGL, out Sdl2Window window, out _graphicsDevice);
+            NeoVeldridStartup.CreateWindowAndGraphicsDevice(windowCI, options, backend, out Sdl2Window window, out _graphicsDevice);
             window.Title = $"{window.Title} ({_graphicsDevice.BackendType})";
 
             // Toggle _useRed when R is pressed
