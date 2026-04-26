@@ -61,6 +61,13 @@ namespace NeoVeldrid.SPIRV
                 if (target == CrossCompileTarget.HLSL || target == CrossCompileTarget.MSL)
                 {
                     RemapBindingsHlslMsl(cross, allResources, vsCompiler, fsCompiler, target);
+
+                    // Handle push constants separately — they have no descriptor set/binding
+                    if (target == CrossCompileTarget.HLSL)
+                    {
+                        RemapPushConstantsHlsl(cross, vsCompiler);
+                        RemapPushConstantsHlsl(cross, fsCompiler);
+                    }
                 }
 
                 if (target == CrossCompileTarget.GLSL || target == CrossCompileTarget.ESSL)
@@ -126,6 +133,12 @@ namespace NeoVeldrid.SPIRV
                 if (target == CrossCompileTarget.HLSL || target == CrossCompileTarget.MSL)
                 {
                     RemapBindingsHlslMsl(cross, allResources, csCompiler, null, target);
+
+                    // Handle push constants separately — they have no descriptor set/binding
+                    if (target == CrossCompileTarget.HLSL)
+                    {
+                        RemapPushConstantsHlsl(cross, csCompiler);
+                    }
                 }
 
                 if (target == CrossCompileTarget.GLSL || target == CrossCompileTarget.ESSL)
@@ -555,6 +568,32 @@ namespace NeoVeldrid.SPIRV
                     cross.CompilerSetDecoration(compiler, kvp.Value.IDs[0], Decoration.Binding, imageIndex++);
                 }
             }
+        }
+
+        private static void RemapPushConstantsHlsl(Cross cross, SpvcCompiler* compiler)
+        {
+            if (compiler == null) return;
+
+            SpvcResources* resources = null;
+            Check(cross, null, cross.CompilerCreateShaderResources(compiler, &resources));
+
+            ReflectedResource* pushConstants = null;
+            nuint count = 0;
+            cross.ResourcesGetResourceListForType(
+                resources, ResourceType.PushConstant, &pushConstants, &count);
+
+            if (count == 0) return;
+
+            // Map push_constant block to register b15 — matches PushConstantSlot in D3D11CommandList
+            var rootConstants = new HlslRootConstants
+            {
+                Start = 0,
+                End = 128, // Must match PushConstantBufferSize in D3D11CommandList
+                Binding = 15,
+                Space = 0
+            };
+
+            Check(cross, null, cross.CompilerHlslSetRootConstantsLayout(compiler, &rootConstants, 1));
         }
 
         #endregion
