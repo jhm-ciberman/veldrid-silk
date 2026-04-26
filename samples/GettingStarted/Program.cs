@@ -156,10 +156,14 @@ void main()
 
         private static void Draw()
         {
+            // Begin() must be called before commands can be issued.
             _commandList.Begin();
+
+            // We want to render directly to the output window.
             _commandList.SetFramebuffer(_graphicsDevice.SwapchainFramebuffer);
             _commandList.ClearColorTarget(0, RgbaFloat.Black);
 
+            // Set all relevant state to draw our quad.
             _commandList.SetVertexBuffer(0, _vertexBuffer);
             _commandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
             _commandList.SetPipeline(_pipeline);
@@ -175,8 +179,11 @@ void main()
                 vertexOffset: 0,
                 instanceStart: 0);
 
+            // End() must be called before commands can be submitted for execution.
             _commandList.End();
             _graphicsDevice.SubmitCommands(_commandList);
+
+            // Once commands have been submitted, the rendered image can be presented to the application window.
             _graphicsDevice.SwapBuffers();
         }
 
