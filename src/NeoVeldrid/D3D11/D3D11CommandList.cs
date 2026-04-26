@@ -51,7 +51,7 @@ namespace NeoVeldrid.D3D11
         // Push Constants
         private ComPtr<ID3D11Buffer> _pushConstantBuffer;
         private const uint PushConstantBufferSize = 256; // Must be multiple of 16 in D3D11
-        private const uint PushConstantSlot = 15;        // Reserved CB slot
+        private const uint PushConstantSlot = 13;        // Reserved CB slot
 
         private new D3D11Pipeline _graphicsPipeline;
         private BoundResourceSetInfo[] _graphicsResourceSets = new BoundResourceSetInfo[1];

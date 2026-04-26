@@ -21,6 +21,8 @@ namespace NeoVeldrid.SPIRV
     {
         private static readonly Cross s_cross = Cross.GetApi();
 
+        private const uint PushConstantHlslRegister = 13;
+
         internal static VertexFragmentCompilationResult CompileVertexFragment(
             byte[] vsSpirv, byte[] fsSpirv, CrossCompileTarget target, CrossCompileOptions options)
         {
@@ -75,6 +77,8 @@ namespace NeoVeldrid.SPIRV
                     BuildCombinedImageSamplers(cross, vsCompiler);
                     BuildCombinedImageSamplers(cross, fsCompiler);
                     RenameStageIO(cross, vsCompiler, fsCompiler);
+                    RenamePushConstantsGlsl(cross, vsCompiler);
+                    RenamePushConstantsGlsl(cross, fsCompiler);
                 }
 
                 if (target == CrossCompileTarget.ESSL)
@@ -144,6 +148,7 @@ namespace NeoVeldrid.SPIRV
                 if (target == CrossCompileTarget.GLSL || target == CrossCompileTarget.ESSL)
                 {
                     BuildCombinedImageSamplers(cross, csCompiler);
+                    RenamePushConstantsGlsl(cross, csCompiler);
                 }
 
                 if (target == CrossCompileTarget.ESSL)
@@ -248,6 +253,8 @@ namespace NeoVeldrid.SPIRV
                     cross.CompilerOptionsSetUint(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslVersion, version);
                     cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslES, 0);
                     cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslEnable420PackExtension, 0);
+                    // Force push_constant blocks to emit as a proper UBO instead of plain uniforms
+                    cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslEmitPushConstantAsUniformBuffer, 1);
                     break;
                 }
 
@@ -257,6 +264,8 @@ namespace NeoVeldrid.SPIRV
                     cross.CompilerOptionsSetUint(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslVersion, version);
                     cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslES, 1);
                     cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslEnable420PackExtension, 0);
+                    // Force push_constant blocks to emit as a proper UBO instead of plain uniforms
+                    cross.CompilerOptionsSetBool(opts, Silk.NET.SPIRV.Cross.CompilerOption.GlslEmitPushConstantAsUniformBuffer, 1);
                     break;
                 }
 
@@ -584,16 +593,44 @@ namespace NeoVeldrid.SPIRV
 
             if (count == 0) return;
 
-            // Map push_constant block to register b15 — matches PushConstantSlot in D3D11CommandList
+            // Map push_constant block to register b13 — matches PushConstantSlot in D3D11CommandList
             var rootConstants = new HlslRootConstants
             {
                 Start = 0,
                 End = 128, // Must match PushConstantBufferSize in D3D11CommandList
-                Binding = 15,
+                Binding = PushConstantHlslRegister,
                 Space = 0
             };
 
             Check(cross, null, cross.CompilerHlslSetRootConstantsLayout(compiler, &rootConstants, 1));
+        }
+
+        /// <summary>
+        /// Forces the push_constant block's type name to _PushConstants in the GLSL output
+        /// so OpenGLPipeline.SetupPushConstants can find it via GetUniformBlockIndex.
+        /// spirv-cross does not guarantee preserving the block name during conversion.
+        /// </summary>
+        private static void RenamePushConstantsGlsl(Cross cross, SpvcCompiler* compiler)
+        {
+            if (compiler == null) return;
+
+            SpvcResources* resources = null;
+            Check(cross, null, cross.CompilerCreateShaderResources(compiler, &resources));
+
+            ReflectedResource* pushConstants = null;
+            nuint count = 0;
+            cross.ResourcesGetResourceListForType(
+                resources, ResourceType.PushConstant, &pushConstants, &count);
+
+            for (nuint i = 0; i < count; i++)
+            {
+                // spirv-cross GLSL uses the variable name (Id) as the interface block name,
+                // NOT the type name (BaseTypeId) — this is what GetUniformBlockIndex queries
+                SetNativeName(cross, compiler, pushConstants[i].Id, "_PushConstants");
+
+                // Also set the type name as a fallback in case the spirv-cross version differs
+                SetNativeName(cross, compiler, pushConstants[i].BaseTypeId, "_PushConstants");
+            }
         }
 
         #endregion

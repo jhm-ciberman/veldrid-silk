@@ -188,32 +188,19 @@ namespace NeoVeldrid.OpenGL
 
         private void SetupPushConstants()
         {
-            _pushConstantBlockIndex = _gl.GetUniformBlockIndex(_program, PushConstantBlockName);
+            _pushConstantBlockIndex = _gl.GetUniformBlockIndex(_program, "_PushConstants");
             CheckLastError();
 
-            if (_pushConstantBlockIndex == GL_INVALID_INDEX)
-            {
-                return; // Shader doesn't use push constants, nothing to do
-            }
+            if (_pushConstantBlockIndex == GL_INVALID_INDEX) { return; }
 
-            // Create the dedicated UBO for push constant data
             _gl.GenBuffers(1, out _pushConstantBuffer);
             CheckLastError();
-
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, _pushConstantBuffer);
             CheckLastError();
-
-            _gl.BufferData(
-                BufferTargetARB.UniformBuffer,
-                PushConstantBufferSize,
-                null,
-                BufferUsageARB.DynamicDraw);
+            _gl.BufferData(BufferTargetARB.UniformBuffer, PushConstantBufferSize, null, BufferUsageARB.DynamicDraw);
             CheckLastError();
-
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
             CheckLastError();
-
-            // Permanently bind the block to our reserved binding point
             _gl.UniformBlockBinding(_program, _pushConstantBlockIndex, PushConstantBindingPoint);
             CheckLastError();
         }
