@@ -1165,6 +1165,49 @@ namespace NeoVeldrid.OpenGL
             }
         }
 
+        public void PushConstants(uint offsetInBytes, IntPtr dataPtr, uint sizeInBytes)
+        {
+            OpenGLPipeline pipeline = _graphicsPipelineActive ? _graphicsPipeline : _computePipeline;
+            if (pipeline == null) { return; }
+
+            pipeline.EnsureResourcesCreated();
+
+            if (!pipeline.HasPushConstantBuffer)
+            {
+                return;
+            }
+
+            // PushConstantGLBuffer is a raw uint GL handle, not an OpenGLBuffer wrapper
+            uint glBuffer = pipeline.PushConstantGLBuffer;
+
+            if (_extensions.ARB_DirectStateAccess)
+            {
+                _gl.NamedBufferSubData(
+                    glBuffer,
+                    (IntPtr)offsetInBytes,
+                    sizeInBytes,
+                    dataPtr.ToPointer());
+                CheckLastError();
+            }
+            else
+            {
+                _gl.BindBuffer(BufferTargetARB.UniformBuffer, glBuffer);
+                CheckLastError();
+                _gl.BufferSubData(
+                    BufferTargetARB.UniformBuffer,
+                    (IntPtr)offsetInBytes,
+                    (UIntPtr)sizeInBytes,
+                    dataPtr.ToPointer());
+                CheckLastError();
+            }
+
+            // PushConstantBindingSlot is the public property name, not PushConstantBindingPoint
+            _gl.UniformBlockBinding(pipeline.Program, pipeline.PushConstantBlockIndex, pipeline.PushConstantBindingSlot);
+            CheckLastError();
+            _gl.BindBufferBase(BufferTargetARB.UniformBuffer, pipeline.PushConstantBindingSlot, glBuffer);
+            CheckLastError();
+        }
+
         public void UpdateTexture(
             Texture texture,
             IntPtr dataPtr,

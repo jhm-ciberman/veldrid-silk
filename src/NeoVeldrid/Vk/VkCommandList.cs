@@ -748,6 +748,19 @@ namespace NeoVeldrid.Vk
             CopyBuffer(stagingBuffer, 0, buffer, bufferOffsetInBytes, sizeInBytes);
         }
 
+        private protected override void PushConstantsCore(uint offsetInBytes, IntPtr source, uint sizeInBytes)
+        {
+            EnsureRenderPassActive();
+
+            _gd.Vk.CmdPushConstants(
+                _cb,
+                _currentGraphicsPipeline.PipelineLayout,
+                ShaderStageFlags.AllGraphics,
+                offsetInBytes,
+                sizeInBytes,
+                source.ToPointer());
+        }
+
         private protected override void CopyBufferCore(
             DeviceBuffer source,
             uint sourceOffset,

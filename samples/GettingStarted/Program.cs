@@ -16,6 +16,7 @@ namespace GettingStarted
         private static DeviceBuffer _indexBuffer;
         private static Shader[] _shaders;
         private static Pipeline _pipeline;
+        private static bool _useRed = false;
 
         private const string VertexCode = @"
 #version 450
@@ -25,10 +26,17 @@ layout(location = 1) in vec4 Color;
 
 layout(location = 0) out vec4 fsin_Color;
 
+layout(push_constant) uniform _PushConstants {
+    int UseRed;
+} pc;
+
 void main()
 {
     gl_Position = vec4(Position, 0, 1);
-    fsin_Color = Color;
+    if (pc.UseRed == 1)
+        fsin_Color = vec4(1.0, 0.0, 0.0, 1.0);
+    else
+        fsin_Color = Color;
 }";
 
         private const string FragmentCode = @"
@@ -50,7 +58,7 @@ void main()
                 Y = 100,
                 WindowWidth = 960,
                 WindowHeight = 540,
-                WindowTitle = "NeoVeldrid Tutorial"
+                WindowTitle = "NeoVeldrid Tutorial — Press R to toggle red"
             };
             GraphicsDeviceOptions options = new GraphicsDeviceOptions
             {
@@ -72,16 +80,22 @@ void main()
             NeoVeldridStartup.CreateWindowAndGraphicsDevice(windowCI, options, backend, out Sdl2Window window, out _graphicsDevice);
             window.Title = $"{window.Title} ({_graphicsDevice.BackendType})";
 
+            // Toggle _useRed when R is pressed
+            window.KeyDown += keyEvent =>
+            {
+                if (keyEvent.Key == Key.R)
+                {
+                    _useRed = !_useRed;
+                }
+            };
+
             CreateResources();
 
             while (window.Exists)
             {
                 window.PumpEvents();
-
                 if (window.Exists)
-                {
                     Draw();
-                }
             }
 
             DisposeResources();
@@ -98,56 +112,45 @@ void main()
                 new VertexPositionColor(new Vector2(-.75f, -.75f), RgbaFloat.Blue),
                 new VertexPositionColor(new Vector2(.75f, -.75f), RgbaFloat.Yellow)
             };
-            BufferDescription vbDescription = new BufferDescription(
-                4 * VertexPositionColor.SizeInBytes,
-                BufferUsage.VertexBuffer);
-            _vertexBuffer = factory.CreateBuffer(vbDescription);
+            _vertexBuffer = factory.CreateBuffer(new BufferDescription(
+                4 * VertexPositionColor.SizeInBytes, BufferUsage.VertexBuffer));
             _graphicsDevice.UpdateBuffer(_vertexBuffer, 0, quadVertices);
 
             ushort[] quadIndices = { 0, 1, 2, 3 };
-            BufferDescription ibDescription = new BufferDescription(
-                4 * sizeof(ushort),
-                BufferUsage.IndexBuffer);
-            _indexBuffer = factory.CreateBuffer(ibDescription);
+            _indexBuffer = factory.CreateBuffer(new BufferDescription(
+                4 * sizeof(ushort), BufferUsage.IndexBuffer));
             _graphicsDevice.UpdateBuffer(_indexBuffer, 0, quadIndices);
 
             VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
                 new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
                 new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
 
-            ShaderDescription vertexShaderDesc = new ShaderDescription(
-                ShaderStages.Vertex,
-                Encoding.UTF8.GetBytes(VertexCode),
-                "main");
-            ShaderDescription fragmentShaderDesc = new ShaderDescription(
-                ShaderStages.Fragment,
-                Encoding.UTF8.GetBytes(FragmentCode),
-                "main");
+            _shaders = factory.CreateFromSpirv(
+                new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(VertexCode), "main", true),
+                new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(FragmentCode), "main", true));
 
-            _shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
-
-            // Create pipeline
-            GraphicsPipelineDescription pipelineDescription = new GraphicsPipelineDescription();
-            pipelineDescription.BlendState = BlendStateDescription.SingleOverrideBlend;
-            pipelineDescription.DepthStencilState = new DepthStencilStateDescription(
-                depthTestEnabled: true,
-                depthWriteEnabled: true,
-                comparisonKind: ComparisonKind.LessEqual);
-            pipelineDescription.RasterizerState = new RasterizerStateDescription(
-                cullMode: FaceCullMode.Back,
-                fillMode: PolygonFillMode.Solid,
-                frontFace: FrontFace.Clockwise,
-                depthClipEnabled: true,
-                scissorTestEnabled: false);
-            pipelineDescription.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-            pipelineDescription.ResourceLayouts = System.Array.Empty<ResourceLayout>();
-            pipelineDescription.ShaderSet = new ShaderSetDescription(
-                vertexLayouts: new VertexLayoutDescription[] { vertexLayout },
-                shaders: _shaders);
-            pipelineDescription.Outputs = _graphicsDevice.SwapchainFramebuffer.OutputDescription;
+            GraphicsPipelineDescription pipelineDescription = new GraphicsPipelineDescription
+            {
+                BlendState = BlendStateDescription.SingleOverrideBlend,
+                DepthStencilState = new DepthStencilStateDescription(
+                    depthTestEnabled: true,
+                    depthWriteEnabled: true,
+                    comparisonKind: ComparisonKind.LessEqual),
+                RasterizerState = new RasterizerStateDescription(
+                    cullMode: FaceCullMode.Back,
+                    fillMode: PolygonFillMode.Solid,
+                    frontFace: FrontFace.Clockwise,
+                    depthClipEnabled: true,
+                    scissorTestEnabled: false),
+                PrimitiveTopology = PrimitiveTopology.TriangleStrip,
+                ResourceLayouts = Array.Empty<ResourceLayout>(),
+                ShaderSet = new ShaderSetDescription(
+                    vertexLayouts: new[] { vertexLayout },
+                    shaders: _shaders),
+                Outputs = _graphicsDevice.SwapchainFramebuffer.OutputDescription
+            };
 
             _pipeline = factory.CreateGraphicsPipeline(pipelineDescription);
-
             _commandList = factory.CreateCommandList();
         }
 
@@ -164,7 +167,11 @@ void main()
             _commandList.SetVertexBuffer(0, _vertexBuffer);
             _commandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
             _commandList.SetPipeline(_pipeline);
-            // Issue a Draw command for a single instance with 4 indices.
+
+            // Push the current toggle state — 1 = red, 0 = normal colors
+            int useRed = _useRed ? 1 : 0;
+            _commandList.PushConstants(0, useRed);
+
             _commandList.DrawIndexed(
                 indexCount: 4,
                 instanceCount: 1,
@@ -184,9 +191,7 @@ void main()
         {
             _pipeline.Dispose();
             foreach (Shader shader in _shaders)
-            {
                 shader.Dispose();
-            }
             _commandList.Dispose();
             _vertexBuffer.Dispose();
             _indexBuffer.Dispose();

@@ -12,6 +12,7 @@ namespace NeoVeldrid.SPIRV
         /// be used as the source of an OpenGL-style GLSL shader, then this property should be set to <see langword="true"/>.
         /// </summary>
         public bool Debug { get; set; }
+
         /// <summary>
         /// An array of <see cref="MacroDefinition"/> which defines the set of preprocessor macros to define when compiling the
         /// GLSL source code.

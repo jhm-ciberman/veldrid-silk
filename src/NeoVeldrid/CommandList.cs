@@ -898,6 +898,75 @@ namespace NeoVeldrid
             uint sizeInBytes);
 
         /// <summary>
+        /// Pushes a small amount of data directly into the command stream for use by shaders.
+        /// This maps to push constants on Vulkan, glUniform on OpenGL, and a Map/Discard
+        /// constant buffer on D3D11.
+        /// A graphics <see cref="Pipeline"/> must be active before this can be called.
+        /// The maximum portable size of all push constant data is 128 bytes, which is the
+        /// minimum guaranteed by the Vulkan specification.
+        /// </summary>
+        /// <typeparam name="T">The type of data to push. Must be an unmanaged value type.</typeparam>
+        /// <param name="offsetInBytes">The offset, in bytes, into the push constant block at which data will be written.</param>
+        /// <param name="value">The value to push.</param>
+        public unsafe void PushConstants<T>(uint offsetInBytes, T value) where T : unmanaged
+        {
+            ref byte sourceByteRef = ref Unsafe.AsRef<byte>(Unsafe.AsPointer(ref value));
+            fixed (byte* ptr = &sourceByteRef)
+            {
+                PushConstants(offsetInBytes, (IntPtr)ptr, (uint)sizeof(T));
+            }
+        }
+
+        /// <summary>
+        /// Pushes a small amount of data directly into the command stream for use by shaders.
+        /// This maps to push constants on Vulkan, glUniform on OpenGL, and a Map/Discard
+        /// constant buffer on D3D11.
+        /// A graphics <see cref="Pipeline"/> must be active before this can be called.
+        /// The maximum portable size of all push constant data is 128 bytes, which is the
+        /// minimum guaranteed by the Vulkan specification.
+        /// </summary>
+        /// <typeparam name="T">The type of data to push. Must be an unmanaged value type.</typeparam>
+        /// <param name="offsetInBytes">The offset, in bytes, into the push constant block at which data will be written.</param>
+        /// <param name="value">A reference to the value to push.</param>
+        public unsafe void PushConstants<T>(uint offsetInBytes, ref T value) where T : unmanaged
+        {
+            ref byte sourceByteRef = ref Unsafe.AsRef<byte>(Unsafe.AsPointer(ref value));
+            fixed (byte* ptr = &sourceByteRef)
+            {
+                PushConstants(offsetInBytes, (IntPtr)ptr, Util.USizeOf<T>());
+            }
+        }
+
+        /// <summary>
+        /// Pushes a small amount of data directly into the command stream for use by shaders.
+        /// This maps to push constants on Vulkan, glUniform on OpenGL, and a Map/Discard
+        /// constant buffer on D3D11.
+        /// A graphics <see cref="Pipeline"/> must be active before this can be called.
+        /// The maximum portable size of all push constant data is 128 bytes, which is the
+        /// minimum guaranteed by the Vulkan specification.
+        /// </summary>
+        /// <param name="offsetInBytes">The offset, in bytes, into the push constant block at which data will be written.</param>
+        /// <param name="source">A pointer to the data to push.</param>
+        /// <param name="sizeInBytes">The size of the data to push, in bytes.</param>
+        public void PushConstants(uint offsetInBytes, IntPtr source, uint sizeInBytes)
+        {
+#if VALIDATE_USAGE
+            if (_graphicsPipeline == null)
+            {
+                throw new NeoVeldridException($"A graphics {nameof(Pipeline)} must be active before {nameof(PushConstants)} can be called.");
+            }
+
+            if (sizeInBytes == 0)
+            {
+                return;
+            }
+#endif
+            PushConstantsCore(offsetInBytes, source, sizeInBytes);
+        }
+
+        private protected abstract void PushConstantsCore(uint offsetInBytes, IntPtr source, uint sizeInBytes);
+
+        /// <summary>
         /// Copies a region from the source <see cref="DeviceBuffer"/> to another region in the destination <see cref="DeviceBuffer"/>.
         /// </summary>
         /// <param name="source">The source <see cref="DeviceBuffer"/> from which data will be copied.</param>

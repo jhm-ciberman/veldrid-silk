@@ -157,6 +157,11 @@ namespace NeoVeldrid.OpenGL
             _currentCommands.UpdateBuffer(buffer, bufferOffsetInBytes, source, sizeInBytes);
         }
 
+        private protected override void PushConstantsCore(uint offsetInBytes, IntPtr source, uint sizeInBytes)
+        {
+            _currentCommands.PushConstants(offsetInBytes, source, sizeInBytes);
+        }
+
         private protected override void CopyBufferCore(
             DeviceBuffer source,
             uint sourceOffset,

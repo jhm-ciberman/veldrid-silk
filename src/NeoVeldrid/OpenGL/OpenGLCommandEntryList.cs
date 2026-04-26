@@ -24,6 +24,7 @@ namespace NeoVeldrid.OpenGL
         void SetViewport(uint index, ref Viewport viewport);
         void ResolveTexture(Texture source, Texture destination);
         void UpdateBuffer(DeviceBuffer buffer, uint bufferOffsetInBytes, IntPtr source, uint sizeInBytes);
+        void PushConstants(uint offsetInBytes, IntPtr source, uint sizeInBytes);
         void ExecuteAll(OpenGLCommandExecutor executor);
         void DispatchIndirect(DeviceBuffer indirectBuffer, uint offset);
         void CopyBuffer(DeviceBuffer source, uint sourceOffset, DeviceBuffer destination, uint destinationOffset, uint sizeInBytes);

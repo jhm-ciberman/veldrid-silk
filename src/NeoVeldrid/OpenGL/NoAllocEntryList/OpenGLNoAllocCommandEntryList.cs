@@ -91,6 +91,9 @@ namespace NeoVeldrid.OpenGL.NoAllocEntryList
         private const byte InsertDebugMarkerEntryID = 26;
         private static readonly uint InsertDebugMarkerEntrySize = Util.USizeOf<NoAllocInsertDebugMarkerEntry>();
 
+        private const byte PushConstantsEntryID = 27;
+        private static readonly uint PushConstantsEntrySize = Util.USizeOf<NoAllocPushConstantsEntry>();
+
         public OpenGLCommandList Parent { get; }
 
         public OpenGLNoAllocCommandEntryList(OpenGLCommandList cl)
@@ -334,6 +337,12 @@ namespace NeoVeldrid.OpenGL.NoAllocEntryList
                             (IntPtr)dataPtr, ube.StagingBlockSize);
                         currentOffset += UpdateBufferEntrySize;
                         break;
+                    case PushConstantsEntryID:
+                        NoAllocPushConstantsEntry pce = Unsafe.ReadUnaligned<NoAllocPushConstantsEntry>(entryBasePtr);
+                        byte* pcDataPtr = (byte*)pce.StagingBlock.Data;
+                        executor.PushConstants(pce.OffsetInBytes, (IntPtr)pcDataPtr, pce.StagingBlockSize);
+                        currentOffset += PushConstantsEntrySize;
+                        break;
                     case CopyBufferEntryID:
                         NoAllocCopyBufferEntry cbe = Unsafe.ReadUnaligned<NoAllocCopyBufferEntry>(entryBasePtr);
                         executor.CopyBuffer(
@@ -530,6 +539,14 @@ namespace NeoVeldrid.OpenGL.NoAllocEntryList
             _stagingBlocks.Add(stagingBlock);
             NoAllocUpdateBufferEntry entry = new NoAllocUpdateBufferEntry(Track(buffer), bufferOffsetInBytes, stagingBlock, sizeInBytes);
             AddEntry(UpdateBufferEntryID, ref entry);
+        }
+
+        public void PushConstants(uint offsetInBytes, IntPtr source, uint sizeInBytes)
+        {
+            StagingBlock stagingBlock = _memoryPool.Stage(source, sizeInBytes);
+            _stagingBlocks.Add(stagingBlock);
+            NoAllocPushConstantsEntry entry = new NoAllocPushConstantsEntry(offsetInBytes, stagingBlock, sizeInBytes);
+            AddEntry(PushConstantsEntryID, ref entry);
         }
 
         public void CopyBuffer(DeviceBuffer source, uint sourceOffset, DeviceBuffer destination, uint destinationOffset, uint sizeInBytes)
